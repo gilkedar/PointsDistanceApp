@@ -3,37 +3,42 @@ from utils import config
 from utils.logger import Logger
 from utils.db_manager import DbManager
 from utils.csv_parser import CsvBytesParser
-from utils.links_generator import LinksGenerator
 from utils.point import Point
-import io
-import csv
+from utils.db_item import DbItem
+
 app = Flask(__name__)
 
 class HttpServer:
 
     def __init__(self):
         self._db_manager = DbManager()
-        # self._logger = Logger(self.__class__.__name__)
+        self._logger = Logger(self.__class__.__name__)
 
-    def add_data(self, item):
-        self._db_manager.insert()
+    def add_data_to_db(self, item):
+        return self._db_manager.insert(item)
 
-    def get_data(self, uuid):
+    def get_data_from_db(self, uuid):
         return self._db_manager.get(uuid)
 
-    def handle_new_data(self, request):
+    def handle_new_data(self, data):
 
-        csv_parser = CsvBytesParser()
-        links_generator = LinksGenerator()
+        csv_parser = CsvBytesParser(data)
 
         points = []
         links = []
-        for line in self.csv_parser.read_next_line():
-            new_point = Point(line)
-            links.append(links_generator.get_new_links(new_point, points))
+        for line in csv_parser.get_next_line():
+            try:
+                name, lat, lon = line
+            except Exception as ex:
+                self._logger.warning("invalid item in csv line, skipping...")
+                continue
+            new_point = Point(name, lat, lon)
+            links.extend(new_point.create_links(points))
             points.append(new_point)
 
-        item = self.add_data(points, links)
+        db_item = DbItem(points,links)
+
+        item = self.add_data_to_db(db_item)
 
         return item
 
@@ -49,14 +54,9 @@ def get_addresses():
 
 
     r = request
-
+    data = r.get_data()
     try:
-        file = r.data
-        file = io.StringIO(file.decode())
-        for line in file:
-            print(line.strip('\r\n'))
-        ans = http_main_server.handle_new_data(r)
-
+        ans = http_main_server.handle_new_data(data)
     except Exception as ex:
         pass
 
@@ -69,7 +69,7 @@ def get_response():
     :return: json containing db query results
     """
     r = request
-
+    data = r.get_data_from_db()
     try:
         item = http_main_server.get_item(r)
     except Exception as ex:
