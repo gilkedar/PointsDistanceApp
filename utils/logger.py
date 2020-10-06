@@ -1,7 +1,6 @@
 import logging
 import os
 import datetime
-from Utils.Settings import Config
 
 class Logger(logging.Logger):
 
