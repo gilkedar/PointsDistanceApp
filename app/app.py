@@ -5,14 +5,18 @@ from utils.db_manager import DbManager
 from utils.csv_parser import CsvBytesParser
 from utils.point import Point
 from utils.db_item import DbItem
+import json
+from bson import json_util
+
 
 app = Flask(__name__)
+
 
 class HttpServer:
 
     def __init__(self):
         self._db_manager = DbManager(DbItem)
-        self._logger = Logger(self.__class__.__name__)
+        self.logger = Logger(self.__class__.__name__)
 
     def add_data_to_db(self, item):
         return self._db_manager.insert(item)
@@ -20,7 +24,7 @@ class HttpServer:
     def get_data_from_db(self, uuid):
         return self._db_manager.get(uuid)
 
-    def handle_new_data(self, data):
+    def handle_new_data_request(self, data):
 
         csv_parser = CsvBytesParser(data)
 
@@ -30,7 +34,7 @@ class HttpServer:
             try:
                 name, lat, lon = line
             except Exception as ex:
-                self._logger.warning("invalid item in csv line, skipping...")
+                self.logger.warning("invalid item in csv line, skipping...")
                 continue
             new_point = Point(name, lat, lon)
             links.extend(new_point.create_links(points))
@@ -42,8 +46,9 @@ class HttpServer:
 
         return item
 
-    def get_item(self, request):
-        pass
+    def handle_get_item_request(self, desired_id):
+        return self.get_data_from_db(desired_id)
+
 
 @app.route(config.URI_POST_ADDRESSES, methods=['POST'])
 def get_addresses():
@@ -54,9 +59,9 @@ def get_addresses():
     r = request
     data = r.get_data()
     try:
-        ans = http_main_server.handle_new_data(data)
+        ans = http_main_server.handle_new_data_request(data)
     except Exception as ex:
-        pass
+        http_main_server.logger.error(ex)
 
     return Response(response=str(ans),
                     status=200,
@@ -70,21 +75,26 @@ def get_response():
     :return: json containing db query results
     """
     r = request
-    data = r.get_data_from_db()
+    desired_id = r.data.decode("utf-8")
+    item = {}
     try:
-        item = http_main_server.get_item(r)
+        item = http_main_server.handle_get_item_request(desired_id)
     except Exception as ex:
-        pass
+        http_main_server.logger.error(ex)
 
-    return Response(item)
+    return Response(response=json.dumps(item, default=json_util.default),
+                    status=200,
+                    mimetype="application/json")
 
 
 if __name__ == '__main__':
-        try:
-            http_main_server = HttpServer()
-            app.run(host=config.HTTP_SERVER_IP, port=config.HTTP_SERVER_PORT)
-        except Exception as ex:
-            if http_main_server:
-                http_main_server.logger.critical(ex)
-            else:
-                print(ex)
+
+    http_main_server = None
+    try:
+        http_main_server = HttpServer()
+        app.run(host=config.HTTP_SERVER_IP, port=config.HTTP_SERVER_PORT)
+    except Exception as ex:
+        if http_main_server:
+            http_main_server.logger.critical(ex)
+        else:
+            print(ex)

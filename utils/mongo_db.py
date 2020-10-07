@@ -1,5 +1,6 @@
 import pymongo
 from utils import config
+from bson.objectid import ObjectId
 
 
 class MongoDb:
@@ -14,6 +15,6 @@ class MongoDb:
         return x.inserted_id
 
     def get(self, id):
-        query = {"_id": id}
-        ans = self.collection.find(query)
+        query = {"_id": ObjectId(id)}
+        ans = self.collection.find_one(query)
         return ans
