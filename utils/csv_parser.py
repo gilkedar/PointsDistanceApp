@@ -29,7 +29,7 @@ class CsvBytesParser:
             if num_of_lines_to_ignore:
                 num_of_lines_to_ignore -= 1
                 continue
-            if line == "\r\n":  # ignore empy lines as well
+            if line == "\r\n" or line[0]=="-":  # ignore empy lines and irrelevant lines
                 continue
             items = self.parse_line(line)
             yield items

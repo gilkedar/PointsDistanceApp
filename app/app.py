@@ -11,7 +11,7 @@ app = Flask(__name__)
 class HttpServer:
 
     def __init__(self):
-        self._db_manager = DbManager()
+        self._db_manager = DbManager(DbItem)
         self._logger = Logger(self.__class__.__name__)
 
     def add_data_to_db(self, item):
@@ -51,8 +51,6 @@ def get_addresses():
     request containing csv file with points and their lat/lon
     :return: db uuuid for stored json response
     """
-
-
     r = request
     data = r.get_data()
     try:
@@ -60,7 +58,10 @@ def get_addresses():
     except Exception as ex:
         pass
 
-    return Response(ans)
+    return Response(response=str(ans),
+                    status=200,
+                    mimetype="plain/text")
+
 
 @app.route(config.URI_GET_RESPONSE, methods=['GET'])
 def get_response():
@@ -83,6 +84,7 @@ if __name__ == '__main__':
             http_main_server = HttpServer()
             app.run(host=config.HTTP_SERVER_IP, port=config.HTTP_SERVER_PORT)
         except Exception as ex:
-            http_main_server.logger.critical(ex)
-        finally:
-            http_main_server.closeResources()
+            if http_main_server:
+                http_main_server.logger.critical(ex)
+            else:
+                print(ex)
